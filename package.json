@@ -25,10 +25,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis portable --x64",
-    "dist:zip": "electron-builder --win zip --x64",
-    "dist:store": "electron-builder --win appx --x64",
-    "build:mpegts": "node scripts/build-mpegts.js",
+    "dist": "electron-builder --win nsis portable --x64 --publish never",
+    "dist:zip": "electron-builder --win zip --x64 --publish never",
+    "dist:store": "electron-builder --win appx --x64 --publish never",    "build:mpegts": "node scripts/build-mpegts.js",
     "test:media": "python3 scripts/make-test-media.py test-media",
     "set-repo": "node scripts/set-repo.js",
     "test": "node --test test/unit.test.js"
