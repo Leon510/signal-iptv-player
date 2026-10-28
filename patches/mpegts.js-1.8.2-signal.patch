@@ -1,0 +1,251 @@
+diff --git a/src/demux/ts-demuxer.ts b/src/demux/ts-demuxer.ts
+index 428f39c..d4d2010 100644
+--- a/src/demux/ts-demuxer.ts
++++ b/src/demux/ts-demuxer.ts
+@@ -774,6 +774,9 @@ class TSDemuxer extends BaseDemuxer {
+         let info_start_index = 12 + program_info_length;
+         let info_bytes = section_length - 9 - program_info_length - 4;
+ 
++        // Signal-Patch: alle Tonspuren sammeln (PID, Codec, Sprache) und danach gezielt eine wählen
++        let audio_candidates: Array<{pid: number, codec: string, key: string, language: string, stream_type: number}> = [];
++
+         for (let i = info_start_index; i < info_start_index + info_bytes; ) {
+             let stream_type = data[i] as StreamType;
+             let elementary_PID = ((data[i + 1] & 0x1F) << 8) | data[i + 2];
+@@ -782,22 +785,44 @@ class TSDemuxer extends BaseDemuxer {
+             pmt.pid_stream_type[elementary_PID] = stream_type;
+ 
+             let already_has_video =  pmt.common_pids.h264 || pmt.common_pids.h265;
+-            let already_has_audio = pmt.common_pids.adts_aac || pmt.common_pids.loas_aac || pmt.common_pids.ac3 || pmt.common_pids.eac3 || pmt.common_pids.opus || pmt.common_pids.mp3;
++
++            // Deskriptoren vorab lesen: Sprache (0x0A), DVB AC-3 (0x6A), DVB E-AC-3 (0x7A), Registrierung (0x05)
++            let es_language = '';
++            let es_dvb_audio: string | null = null;
++            for (let offset = i + 5; offset + 1 < i + 5 + ES_info_length; ) {
++                let tag = data[offset];
++                let length = data[offset + 1];
++                if (tag === 0x0A && length >= 3) {
++                    es_language = String.fromCharCode(data[offset + 2], data[offset + 3], data[offset + 4]).toLowerCase().replace(/[^a-z]/g, '');
++                } else if (tag === 0x6A) {
++                    es_dvb_audio = 'ac3';
++                } else if (tag === 0x7A) {
++                    es_dvb_audio = 'eac3';
++                } else if (tag === 0x05 && length >= 4) {
++                    let reg = String.fromCharCode(data[offset + 2], data[offset + 3], data[offset + 4], data[offset + 5]);
++                    if (reg === 'AC-3') es_dvb_audio = 'ac3';
++                    else if (reg === 'EC-3') es_dvb_audio = 'eac3';
++                }
++                offset += 2 + length;
++            }
+ 
+             if (stream_type === StreamType.kH264 && !already_has_video) {
+                 pmt.common_pids.h264 = elementary_PID;
+             } else if (stream_type === StreamType.kH265 && !already_has_video) {
+                 pmt.common_pids.h265 = elementary_PID;
+-            } else if (stream_type === StreamType.kADTSAAC && !already_has_audio) {
+-                pmt.common_pids.adts_aac = elementary_PID;
+-            } else if (stream_type === StreamType.kLOASAAC && !already_has_audio) {
+-                pmt.common_pids.loas_aac = elementary_PID;
+-            } else if (stream_type === StreamType.kAC3 && !already_has_audio) {
+-                pmt.common_pids.ac3 = elementary_PID; // ATSC AC-3
+-            } else if (stream_type === StreamType.kEAC3 && !already_has_audio) {
+-                pmt.common_pids.eac3 = elementary_PID; // ATSC EAC-3
+-            } else if ((stream_type === StreamType.kMPEG1Audio || stream_type === StreamType.kMPEG2Audio) && !already_has_audio) {
+-                pmt.common_pids.mp3 = elementary_PID;
++            } else if (stream_type === StreamType.kADTSAAC) {
++                audio_candidates.push({pid: elementary_PID, codec: 'aac', key: 'adts_aac', language: es_language, stream_type});
++            } else if (stream_type === StreamType.kLOASAAC) {
++                audio_candidates.push({pid: elementary_PID, codec: 'aac', key: 'loas_aac', language: es_language, stream_type});
++            } else if (stream_type === StreamType.kAC3) {
++                audio_candidates.push({pid: elementary_PID, codec: 'ac3', key: 'ac3', language: es_language, stream_type}); // ATSC AC-3
++            } else if (stream_type === StreamType.kEAC3) {
++                audio_candidates.push({pid: elementary_PID, codec: 'eac3', key: 'eac3', language: es_language, stream_type}); // ATSC EAC-3
++            } else if (stream_type === StreamType.kMPEG1Audio || stream_type === StreamType.kMPEG2Audio) {
++                audio_candidates.push({pid: elementary_PID, codec: 'mp3', key: 'mp3', language: es_language, stream_type});
++            } else if (stream_type === StreamType.kPESPrivateData && es_dvb_audio !== null) {
++                // DVB AC-3 / E-AC-3 als PES Private Data
++                audio_candidates.push({pid: elementary_PID, codec: es_dvb_audio, key: es_dvb_audio, language: es_language, stream_type});
+             } else if (stream_type === StreamType.kPESPrivateData) {
+                 pmt.pes_private_data_pids[elementary_PID] = true;
+                 if (ES_info_length > 0) {
+@@ -920,6 +945,30 @@ class TSDemuxer extends BaseDemuxer {
+             i += 5 + ES_info_length;
+         }
+ 
++        // Signal-Patch: Tonspur wählen. Reihenfolge: gewünschte PID, gewünschte Sprache,
++        // erste abspielbare Spur. Nicht abspielbare Spuren (z. B. AC-3 ohne Decoder) werden
++        // übersprungen, damit der Sender wenigstens mit Bild startet.
++        if (!pmt.common_pids.opus && audio_candidates.length) {
++            const support = this.config_ && this.config_.audioCodecSupport;
++            const supported = (c: {codec: string}) => !support || support[c.codec] !== false;
++            const wantedPid = this.config_ && this.config_.audioTrackPid;
++            const wantedLangs: string[] = (this.config_ && this.config_.audioLanguages) || [];
++            let chosen = audio_candidates.find((c) => c.pid === wantedPid && supported(c));
++            if (!chosen) {
++                for (const lang of wantedLangs) {
++                    chosen = audio_candidates.find((c) => c.language === lang && supported(c));
++                    if (chosen) break;
++                }
++            }
++            if (!chosen) chosen = audio_candidates.find(supported);
++            if (chosen) {
++                (pmt.common_pids as any)[chosen.key] = chosen.pid;
++            }
++            (pmt as any).audio_tracks = audio_candidates.map((c) => ({
++                pid: c.pid, codec: c.codec, language: c.language, supported: supported(c), selected: !!chosen && c.pid === chosen.pid
++            }));
++        }
++
+         if (program_number === this.current_program_) {
+             if (this.pmt_ == undefined) {
+                 Log.v(this.TAG, `Parsed first PMT: ${JSON.stringify(pmt)}`);
+@@ -928,8 +977,14 @@ class TSDemuxer extends BaseDemuxer {
+             if (pmt.common_pids.h264 || pmt.common_pids.h265 || pmt.common_pids.av1) {
+                 this.has_video_ = true;
+             }
+-            if (pmt.common_pids.adts_aac || pmt.common_pids.loas_aac || pmt.common_pids.ac3 || pmt.common_pids.opus || pmt.common_pids.mp3) {
++            if (pmt.common_pids.adts_aac || pmt.common_pids.loas_aac || pmt.common_pids.ac3 || pmt.common_pids.eac3 || pmt.common_pids.opus || pmt.common_pids.mp3) {
+                 this.has_audio_ = true;
++            } else if (this.has_video_) {
++                // keine abspielbare Tonspur: nur Bild
++                this.media_info_.hasAudio = false;
++            }
++            if ((pmt as any).audio_tracks) {
++                (this.media_info_ as any).audioTracks = (pmt as any).audio_tracks;
+             }
+         }
+     }
+diff --git a/src/remux/mp4-remuxer.js b/src/remux/mp4-remuxer.js
+index 2a13734..1b9c2f6 100644
+--- a/src/remux/mp4-remuxer.js
++++ b/src/remux/mp4-remuxer.js
+@@ -39,6 +39,10 @@ class MP4Remuxer {
+         this._videoDtsBase = Infinity;
+         this._audioNextDts = undefined;
+         this._videoNextDts = undefined;
++        // Signal-Patch: Versatz, um Zeitstempel-Sprünge im Livestream (Encoder-Neustart,
++        // Werbung, Schleife) zu einer durchgehenden Zeitachse zu glätten
++        this._audioDiscOffset = 0;
++        this._discontinuityThreshold = (config.discontinuityThreshold != undefined) ? config.discontinuityThreshold : 1000;
+         this._audioStashedLastSample = null;
+         this._videoStashedLastSample = null;
+ 
+@@ -304,7 +308,16 @@ class MP4Remuxer {
+         }
+ 
+ 
+-        let firstSampleOriginalDts = samples[0].dts - this._dtsBase;
++        // Signal-Patch: Sprung schon am Batch-Anfang erkennen
++        if (this._isLive && this._audioNextDts) {
++            let probe = samples[0].dts - this._dtsBase + this._audioDiscOffset;
++            if (Math.abs(probe - this._audioNextDts) > this._discontinuityThreshold) {
++                Log.w(this.TAG, `Audio timestamp discontinuity: ${Math.round(probe - this._audioNextDts)} ms, rebasing`);
++                this._audioDiscOffset += this._audioNextDts - probe;
++            }
++        }
++
++        let firstSampleOriginalDts = samples[0].dts - this._dtsBase + this._audioDiscOffset;
+ 
+         // calculate dtsCorrection
+         if (this._audioNextDts) {
+@@ -356,7 +369,14 @@ class MP4Remuxer {
+         for (let i = 0; i < samples.length; i++) {
+             let sample = samples[i];
+             let unit = sample.unit;
+-            let originalDts = sample.dts - this._dtsBase;
++            let originalDts = sample.dts - this._dtsBase + this._audioDiscOffset;
++            if (this._isLive && this._audioNextDts && Math.abs(originalDts - this._audioNextDts) > this._discontinuityThreshold) {
++                // Signal-Patch: Sprung mitten im Batch
++                Log.w(this.TAG, `Audio timestamp discontinuity: ${Math.round(originalDts - this._audioNextDts)} ms, rebasing`);
++                this._audioDiscOffset += this._audioNextDts - originalDts;
++                originalDts = this._audioNextDts;
++                dtsCorrection = 0;
++            }
+             let dts = originalDts;
+             let needFillSilentFrames = false;
+             let silentFrames = null;
+@@ -442,11 +462,11 @@ class MP4Remuxer {
+ 
+ 
+                 if (i !== samples.length - 1) {
+-                    let nextDts = samples[i + 1].dts - this._dtsBase - dtsCorrection;
++                    let nextDts = samples[i + 1].dts - this._dtsBase + this._audioDiscOffset - dtsCorrection;
+                     sampleDuration = nextDts - dts;
+                 } else {  // the last sample
+                     if (lastSample != null) {  // use stashed sample's dts to calculate sample duration
+-                        let nextDts = lastSample.dts - this._dtsBase - dtsCorrection;
++                        let nextDts = lastSample.dts - this._dtsBase + this._audioDiscOffset - dtsCorrection;
+                         sampleDuration = nextDts - dts;
+                     } else if (mp4Samples.length >= 1) {  // use second last sample duration
+                         sampleDuration = mp4Samples[mp4Samples.length - 1].duration;
+@@ -454,6 +474,9 @@ class MP4Remuxer {
+                         sampleDuration = Math.floor(refSampleDuration);
+                     }
+                 }
++                if (sampleDuration <= 0 || sampleDuration > this._discontinuityThreshold) {
++                    sampleDuration = Math.floor(refSampleDuration || 26);
++                }
+                 this._audioNextDts = dts + sampleDuration;
+             }
+ 
+@@ -643,12 +666,34 @@ class MP4Remuxer {
+         let info = new MediaSegmentInfo();
+         let mp4Samples = [];
+ 
++        // Signal-Patch: korrigierte Zeitstempel vorab berechnen. Springt die Zeit innerhalb
++        // des Batches (Encoder-Neustart, Schleife), wird ab dort nahtlos weitergezählt.
++        let refDur = Math.floor(this._videoMeta.refSampleDuration) || 40;
++        let correctedDts = new Array(samples.length);
++        let prevOriginal = null, prevCorrected = null;
++        let allSamples = lastSample != null ? samples.concat([lastSample]) : samples;
++        let correctedAll = new Array(allSamples.length);
++        for (let i = 0; i < allSamples.length; i++) {
++            let od = allSamples[i].dts - this._dtsBase;
++            if (this._isLive && prevOriginal !== null) {
++                let delta = od - prevOriginal;
++                if (delta < -100 || delta > this._discontinuityThreshold) {
++                    Log.w(this.TAG, `Video timestamp discontinuity: ${Math.round(delta)} ms, rebasing`);
++                    dtsCorrection = od - (prevCorrected + refDur);
++                }
++            }
++            correctedAll[i] = od - dtsCorrection;
++            prevOriginal = od;
++            prevCorrected = correctedAll[i];
++        }
++        for (let i = 0; i < samples.length; i++) correctedDts[i] = correctedAll[i];
++
+         // Correct dts for each sample, and calculate sample duration. Then output to mp4Samples
+         for (let i = 0; i < samples.length; i++) {
+             let sample = samples[i];
+             let originalDts = sample.dts - this._dtsBase;
+             let isKeyframe = sample.isKeyframe;
+-            let dts = originalDts - dtsCorrection;
++            let dts = correctedDts[i];
+             let cts = sample.cts;
+             let pts = dts + cts;
+ 
+@@ -660,18 +705,19 @@ class MP4Remuxer {
+             let sampleDuration = 0;
+ 
+             if (i !== samples.length - 1) {
+-                let nextDts = samples[i + 1].dts - this._dtsBase - dtsCorrection;
+-                sampleDuration = nextDts - dts;
++                sampleDuration = correctedDts[i + 1] - dts;
+             } else {  // the last sample
+                 if (lastSample != null) {  // use stashed sample's dts to calculate sample duration
+-                    let nextDts = lastSample.dts - this._dtsBase - dtsCorrection;
+-                    sampleDuration = nextDts - dts;
++                    sampleDuration = correctedAll[samples.length] - dts;
+                 } else if (mp4Samples.length >= 1) {  // use second last sample duration
+                     sampleDuration = mp4Samples[mp4Samples.length - 1].duration;
+                 } else {  // the only one sample, use reference sample duration
+-                    sampleDuration = Math.floor(this._videoMeta.refSampleDuration);
++                    sampleDuration = refDur;
+                 }
+             }
++            if (this._isLive && (sampleDuration <= 0 || sampleDuration > this._discontinuityThreshold)) {
++                sampleDuration = refDur;
++            }
+ 
+             if (isKeyframe) {
+                 let syncPoint = new SampleInfo(dts, pts, sampleDuration, sample.dts, true);

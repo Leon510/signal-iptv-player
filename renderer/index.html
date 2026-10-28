@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src * data: blob:; media-src * blob: data:; connect-src *; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; worker-src 'self' blob:">
+  <title>Signal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="Signal">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 19a10 10 0 0 1 0-14M19 5a10 10 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Signal</span>
+    </div>
+    <div class="playlist-switch" id="playlistSwitch" hidden>
+      <button class="pl-btn" id="plBtn" aria-haspopup="menu" aria-expanded="false" title="Playlist wechseln">
+        <span id="plName">Playlist</span>
+        <svg viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+      <div class="pl-menu" id="plMenu" role="menu" hidden></div>
+    </div>
+    <div class="sections" id="sections" role="tablist" aria-label="Bereich" hidden>
+      <button role="tab" data-section="live">Live-TV</button>
+      <button role="tab" data-section="movie">Filme</button>
+      <button role="tab" data-section="series">Serien</button>
+    </div>
+    <label class="search" id="searchWrap" hidden>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="search" type="search" placeholder="Überall suchen" autocomplete="off" spellcheck="false">
+      <kbd>/</kbd>
+    </label>
+    <div class="top-actions">
+      <button class="icon-btn" id="addBtn" title="Playlist hinzufügen" aria-label="Playlist hinzufügen">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout" id="layout">
+    <!-- Leerzustand -->
+    <section class="welcome" id="welcome" hidden>
+      <div class="welcome-inner">
+        <h1>Deine Sender,<br>ohne Umwege.</h1>
+        <p>Füge eine M3U-Playlist hinzu, per Link von deinem Anbieter oder als Datei. Signal merkt sie sich für den nächsten Start.</p>
+        <form class="add-form" id="welcomeForm">
+          <input id="welcomeUrl" type="url" placeholder="https://anbieter.example/playlist.m3u" required>
+          <button class="btn primary" type="submit">Playlist laden</button>
+        </form>
+        <button class="btn link" id="welcomeFile" type="button">Stattdessen eine Datei öffnen</button>
+        <p class="form-error" id="welcomeError" role="alert"></p>
+        <p class="welcome-note">Signal enthält keine Sender oder Inhalte. Du brauchst eine Playlist von einem Anbieter,
+          bei dem du rechtmäßig Zugang hast. <a href="#" data-external="legal">Wo gibt es legale Playlisten?</a></p>
+      </div>
+    </section>
+
+    <nav class="rail" id="rail" aria-label="Kategorien" hidden></nav>
+
+    <!-- Live-TV: Senderliste -->
+    <section class="list-pane" id="listPane" hidden>
+      <div class="list-head">
+        <h2 id="listTitle">Alle Sender</h2>
+        <span id="listCount" class="count"></span>
+        <button class="btn ghost small guide-btn" id="guideOpenBtn" title="Programmübersicht (G)">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Programm
+        </button>
+      </div>
+      <p class="fav-hint" id="favHint" hidden>Zum Sortieren Sender ziehen oder <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> drücken.</p>
+      <div class="also" id="listAlso" hidden></div>
+      <div class="list-scroll" id="listScroll" tabindex="-1">
+        <div class="list-spacer" id="listSpacer"></div>
+      </div>
+      <p class="list-empty" id="listEmpty" hidden></p>
+    </section>
+
+    <!-- Programmübersicht -->
+    <section class="guide-pane" id="guidePane" hidden>
+      <div class="guide-head">
+        <h2>Programm</h2>
+        <span class="count" id="guideDay"></span>
+        <div class="guide-nav">
+          <button class="btn ghost small" id="guideNowBtn">Jetzt</button>
+          <button class="btn ghost small" id="guidePrime" title="Zur Hauptsendezeit springen">20:15</button>
+          <button class="icon-btn" id="guidePrev" aria-label="3 Stunden zurück"><svg viewBox="0 0 24 24" width="16" height="16"><path d="m14 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="icon-btn" id="guideNext" aria-label="3 Stunden vor"><svg viewBox="0 0 24 24" width="16" height="16"><path d="m10 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <button class="btn ghost small" id="guideClose">Zurück zur Senderliste</button>
+      </div>
+      <p class="list-empty" id="guideEmpty" hidden></p>
+      <div class="guide-scroll" id="guideScroll">
+        <div class="guide-canvas" id="guideCanvas">
+          <div class="guide-ruler" id="guideRuler"></div>
+          <div id="guideRows"></div>
+          <div class="guide-now" id="guideNow"></div>
+        </div>
+      </div>
+      <div class="guide-detail" id="guideDetail" hidden></div>
+    </section>
+
+    <!-- Filme & Serien -->
+    <section class="vod-pane" id="vodPane" hidden>
+      <div class="vod-browse" id="vodBrowse">
+        <div class="list-head">
+          <h2 id="vodTitle">Alle Filme</h2>
+          <span id="vodCount" class="count"></span>
+        </div>
+        <div class="also" id="vodAlso" hidden></div>
+        <div class="grid-scroll" id="gridScroll" tabindex="-1">
+          <div class="list-spacer" id="gridSpacer"></div>
+        </div>
+        <p class="list-empty" id="vodEmpty" hidden></p>
+      </div>
+
+      <div class="show-view" id="showView" hidden>
+        <button class="btn link back" id="showBack">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="m14 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Zurück
+        </button>
+        <div class="show-head">
+          <div class="show-poster" id="showPoster"></div>
+          <div class="show-info">
+            <h2 id="showTitle"></h2>
+            <p class="show-meta" id="showMeta"></p>
+            <button class="btn primary" id="showPlay">Abspielen</button>
+          </div>
+        </div>
+        <div class="seasons" id="seasonTabs" role="tablist" aria-label="Staffeln"></div>
+        <ol class="episodes" id="episodeList"></ol>
+      </div>
+    </section>
+
+    <section class="stage" id="stage" hidden>
+      <div class="screen" id="screen">
+        <video id="video" playsinline></video>
+
+        <div class="idle" id="idle">
+          <p>Wähle links einen Sender.</p>
+          <ul class="keys">
+            <li><kbd>↑</kbd><kbd>↓</kbd> Sender wechseln</li>
+            <li><kbd>0</kbd>–<kbd>9</kbd> Sendernummer eingeben</li>
+            <li><kbd>H</kbd> Sender ausblenden</li>
+            <li><kbd>A</kbd> Tonspur wechseln</li>
+            <li><kbd>G</kbd> Programmübersicht</li>
+            <li><kbd>Rücktaste</kbd> vorheriger Sender</li>
+            <li><kbd>F</kbd> Vollbild</li>
+          </ul>
+        </div>
+
+        <div class="spinner" id="spinner" hidden><span></span></div>
+
+        <div class="error-box" id="errorBox" hidden>
+          <p class="error-title" id="errorTitle">Dieser Sender lässt sich hier nicht abspielen.</p>
+          <p class="error-detail" id="errorDetail"></p>
+          <div class="error-actions">
+            <button class="btn primary" id="retryBtn">Erneut versuchen</button>
+            <button class="btn ghost" id="errorVlcBtn">In VLC öffnen</button>
+          </div>
+        </div>
+
+        <div class="osd" id="osd" aria-live="polite">
+          <span class="osd-num" id="osdNum"></span>
+          <div class="osd-text">
+            <span class="osd-name" id="osdName"></span>
+            <span class="osd-group" id="osdGroup"></span>
+            <div class="osd-epg" id="osdEpg" hidden>
+              <span class="osd-prog" id="osdProg"></span>
+              <span class="osd-pbar"><span id="osdPbar"></span></span>
+              <span class="osd-next" id="osdNext"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="vod-top" id="vodTop">
+          <button class="btn ghost small" id="vodClose">
+            <svg viewBox="0 0 24 24" width="15" height="15"><path d="m14 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Zurück
+          </button>
+          <div class="vod-name"><span id="vodNowTitle"></span><small id="vodNowSub"></small></div>
+        </div>
+
+        <div class="audio-menu" id="audioMenu" role="menu" hidden></div>
+
+        <div class="mini-bar" id="miniBar">
+          <span class="mini-title" id="miniTitle"></span>
+          <button class="icon-btn" id="miniExit" title="Großes Fenster (P)" aria-label="Großes Fenster">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+        <div class="controls" id="controls">
+          <div class="seek" id="seekRow" hidden>
+            <span class="time" id="timeCur">0:00</span>
+            <input type="range" id="seek" min="0" max="1000" step="1" value="0" aria-label="Position">
+            <span class="time" id="timeDur">0:00</span>
+            <button class="live-pill" id="liveBtn" title="Zurück zum Live-Bild">Live</button>
+          </div>
+          <div class="ctrl-row">
+            <button class="icon-btn" id="playBtn" aria-label="Pause">
+              <svg class="i-pause" viewBox="0 0 24 24" width="20" height="20"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+              <svg class="i-play" viewBox="0 0 24 24" width="20" height="20"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
+            </button>
+            <button class="icon-btn live-only" id="prevBtn" aria-label="Vorheriger Sender" title="Vorheriger Sender (↑)">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="m6 15 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-btn live-only" id="nextBtn" aria-label="Nächster Sender" title="Nächster Sender (↓)">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-btn live-only" id="prevChBtn" aria-label="Vorheriger Sender" title="Vorheriger Sender (Rücktaste)">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-btn vod-only" id="backTenBtn" aria-label="10 Sekunden zurück" title="10 Sekunden zurück (←)">
+              <svg viewBox="0 0 24 24" width="19" height="19"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-btn vod-only" id="fwdTenBtn" aria-label="10 Sekunden vor" title="10 Sekunden vor (→)">
+              <svg viewBox="0 0 24 24" width="19" height="19"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="volume">
+              <button class="icon-btn" id="muteBtn" aria-label="Ton aus">
+                <svg class="i-vol" viewBox="0 0 24 24" width="18" height="18"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <svg class="i-mute" viewBox="0 0 24 24" width="18" height="18"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z" fill="currentColor"/><path d="m16 9.5 5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </button>
+              <input type="range" id="volume" min="0" max="1" step="0.02" aria-label="Lautstärke">
+            </div>
+            <span class="now" id="nowLabel"></span>
+            <button class="btn ghost small vod-only" id="nextEpBtn" hidden>Nächste Folge</button>
+            <button class="btn ghost small audio-btn" id="audioBtn" title="Tonspur wählen (A)" aria-haspopup="menu" aria-expanded="false" hidden>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Tonspur
+            </button>
+            <button class="btn ghost small" id="vlcBtn" title="Stream extern in VLC öffnen">In VLC öffnen</button>
+            <button class="icon-btn" id="miniBtn" aria-label="Mini-Player" title="Mini-Player, bleibt im Vordergrund (P)">
+              <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor"/></svg>
+            </button>
+            <button class="icon-btn" id="fsBtn" aria-label="Vollbild" title="Vollbild (F)">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Playlist hinzufügen -->
+  <dialog class="modal" id="addDialog">
+    <form method="dialog" class="modal-body" id="addForm">
+      <h2>Playlist hinzufügen</h2>
+      <label class="field">
+        <span>Name</span>
+        <input id="addName" type="text" placeholder="z. B. Zuhause">
+      </label>
+      <label class="field">
+        <span>Link zur M3U-Playlist</span>
+        <input id="addUrl" type="url" placeholder="https://anbieter.example/playlist.m3u">
+      </label>
+      <p class="form-error" id="addError" role="alert"></p>
+      <div class="modal-actions">
+        <button class="btn link" type="button" id="addFileBtn">Datei öffnen</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" type="button" id="addCancel">Abbrechen</button>
+        <button class="btn primary" type="submit" id="addSubmit">Playlist laden</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Gruppen und Sender aussortieren -->
+  <dialog class="modal wide" id="groupsDialog">
+    <div class="modal-body">
+      <h2>Auswählen, was du sehen willst</h2>
+      <div class="tabs" id="groupsTabs" role="tablist"></div>
+      <div class="groups-tools">
+        <label class="search small">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="groupsFilter" type="search" placeholder="Gruppen filtern, z. B. „DE“" autocomplete="off" spellcheck="false">
+        </label>
+        <button class="btn ghost small" id="groupsAllOn">Alle einblenden</button>
+        <button class="btn ghost small" id="groupsAllOff">Alle ausblenden</button>
+      </div>
+      <p class="groups-hint" id="groupsHint"></p>
+      <ul class="check-list" id="groupsList"></ul>
+      <div class="modal-actions">
+        <span class="spacer"></span>
+        <button class="btn primary" type="button" id="groupsClose">Fertig</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Einstellungen -->
+  <dialog class="modal wide" id="settingsDialog">
+    <div class="modal-body">
+      <h2>Einstellungen</h2>
+      <h3>Playlisten</h3>
+      <ul class="pl-manage" id="plManage"></ul>
+      <label class="field compact">
+        <span>Playlisten automatisch aktualisieren</span>
+        <select id="autoRefreshSelect">
+          <option value="daily">Einmal am Tag, beim Öffnen</option>
+          <option value="off">Nie, nur über „Aktualisieren“</option>
+        </select>
+      </label>
+      <h3>Inhalte</h3>
+      <div class="setting-row">
+        <p id="hiddenSummary">Nichts ausgeblendet.</p>
+        <button class="btn ghost small" id="openGroupsFromSettings">Gruppen und Sender auswählen</button>
+      </div>
+      <h3>Wiedergabe</h3>
+      <label class="field">
+        <span>Puffer für Live-TV</span>
+        <select id="bufferSelect">
+          <option value="low">Niedrig, schnelleres Umschalten</option>
+          <option value="normal">Normal</option>
+          <option value="high">Hoch, für instabile Verbindungen</option>
+        </select>
+        <small>Hakt ein Sender öfter, stell den Puffer höher. Signal vergrößert ihn nach Aussetzern auch selbst.</small>
+      </label>
+      <h3>Netzwerk</h3>
+      <label class="field">
+        <span>User-Agent für Streams</span>
+        <input id="uaInput" type="text" spellcheck="false">
+        <small>Manche Anbieter liefern nur an bestimmte Player aus. Standard ist VLC.</small>
+      </label>
+      <div class="modal-actions">
+        <button class="btn link" type="button" id="aboutBtn">Über Signal</button>
+        <span class="spacer"></span>
+        <button class="btn primary" type="button" id="settingsClose">Fertig</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Über Signal -->
+  <dialog class="modal wide" id="aboutDialog">
+    <div class="modal-body about">
+      <div class="about-head">
+        <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 19a10 10 0 0 1 0-14M19 5a10 10 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div>
+          <h2>Signal</h2>
+          <p class="about-version" id="aboutVersion"></p>
+        </div>
+      </div>
+      <p>Ein moderner Player für deine eigenen M3U-Playlisten. Kostenlos und quelloffen unter der MIT-Lizenz.</p>
+      <p class="about-note">Signal enthält, vermittelt oder empfiehlt keine Sender, Filme oder Serien. Für die Inhalte deiner
+        Playlist und die Berechtigung, sie anzusehen, bist du selbst verantwortlich.</p>
+      <p class="about-links">
+        <a href="#" data-external="home">Projekt auf GitHub</a>
+        <a href="#" data-external="privacy">Datenschutz</a>
+        <a href="#" data-external="issues">Fehler melden</a>
+      </p>
+      <h3>Open-Source-Komponenten</h3>
+      <div class="about-licenses" id="aboutLicenses"></div>
+      <div class="modal-actions">
+        <span class="spacer"></span>
+        <button class="btn primary" type="button" id="aboutClose" autofocus>Schließen</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status"><span id="toastText"></span><button class="btn link" id="toastAction" hidden></button></div>
+
+  <script src="../node_modules/hls.js/dist/hls.min.js"></script>
+  <script src="vendor/mpegts.js"></script>
+  <script src="m3u.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

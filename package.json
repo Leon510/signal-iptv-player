@@ -1,0 +1,105 @@
+{
+  "name": "signal-iptv",
+  "productName": "Signal",
+  "version": "1.4.0",
+  "description": "Moderner, übersichtlicher IPTV-Player für eigene M3U-Playlisten unter Windows",
+  "keywords": [
+    "iptv",
+    "m3u",
+    "player",
+    "epg",
+    "xmltv",
+    "electron",
+    "windows"
+  ],
+  "homepage": "https://github.com/Leon510/signal",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Leon510/signal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Leon510/signal/issues"
+  },
+  "license": "MIT",
+  "author": "Leon",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable --x64",
+    "dist:zip": "electron-builder --win zip --x64",
+    "dist:store": "electron-builder --win appx --x64",
+    "build:mpegts": "node scripts/build-mpegts.js",
+    "test:media": "python3 scripts/make-test-media.py test-media",
+    "set-repo": "node scripts/set-repo.js",
+    "test": "node --test test/unit.test.js"
+  },
+  "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/instrument-sans": "^5.3.0",
+    "hls.js": "^1.7.3"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
+    "mpegts.js": "1.8.2"
+  },
+  "build": {
+    "appId": "dev.leon.signal",
+    "productName": "Signal",
+    "copyright": "Copyright © 2026 Leon",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "epg.js",
+      "renderer/**",
+      "build/icon.png",
+      "licenses/**",
+      "package.json",
+      "node_modules/hls.js/dist/hls.min.js",
+      "node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-standard-normal.woff2",
+      "node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-*-normal.woff2"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Signal",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "license": "LICENSE",
+      "installerLanguages": [
+        "de_DE",
+        "en_US"
+      ],
+      "language": "1031"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "appx": {
+      "identityName": "PARTNER-CENTER-IDENTITY-NAME",
+      "publisher": "CN=PARTNER-CENTER-PUBLISHER-ID",
+      "publisherDisplayName": "PARTNER-CENTER-PUBLISHER-NAME",
+      "displayName": "Signal – IPTV-Player",
+      "applicationId": "Signal",
+      "backgroundColor": "#0F1724",
+      "languages": [
+        "de-DE",
+        "en-US"
+      ],
+      "artifactName": "${productName}-${version}-store.${ext}"
+    }
+  }
+}

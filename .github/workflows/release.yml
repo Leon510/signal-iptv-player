@@ -1,0 +1,49 @@
+# Baut Installer und portable Version für Windows, sobald ein Versions-Tag gepusht wird:
+#   git tag v1.4.0 && git push origin v1.4.0
+# Das Ergebnis landet als Entwurf unter "Releases" und wird dort von Hand veröffentlicht.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Version im Tag und in package.json vergleichen
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "v$v" = "${GITHUB_REF_NAME}" ] || { echo "Tag ${GITHUB_REF_NAME} passt nicht zu package.json ($v)"; exit 1; }
+      - name: Bauen
+        run: npm run dist
+      - name: Prüfsummen erzeugen
+        shell: bash
+        run: cd dist && sha256sum *.exe > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release-Entwurf anlegen
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: Signal ${{ github.ref_name }}
+          body: |
+            Siehe [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+
+            - **Signal-Setup-…exe**: Installer
+            - **Signal-…-portable.exe**: ohne Installation
+
+            Windows SmartScreen kann warnen, weil der Installer nicht signiert ist:
+            „Weitere Informationen“ → „Trotzdem ausführen“.
+          files: |
+            dist/*.exe
+            dist/SHA256SUMS.txt

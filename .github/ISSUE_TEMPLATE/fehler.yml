@@ -1,0 +1,45 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet
+labels: [fehler]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Melden! **Bitte keine Playlist- oder EPG-Links mit Benutzername oder Passwort posten.**
+        Fragen nach Anbietern oder Playlisten werden geschlossen.
+  - type: textarea
+    id: was
+    attributes:
+      label: Was ist passiert?
+      description: Was hast du gemacht, was hast du erwartet, was ist stattdessen passiert?
+    validations:
+      required: true
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Bereich
+      options: [Live-TV, Filme, Serien, Programmführer, Tonspuren, Playlisten, Installation, Sonstiges]
+    validations:
+      required: true
+  - type: input
+    id: linkart
+    attributes:
+      label: Art des Stream-Links (falls ein bestimmter Sender betroffen ist)
+      description: z. B. „endet auf .ts“, „.m3u8“, „ohne Endung“, „/movie/…mkv“. Ohne Zugangsdaten.
+  - type: textarea
+    id: meldung
+    attributes:
+      label: Fehlermeldung in Signal
+      description: Text der Meldung im Player, falls eine angezeigt wurde.
+  - type: input
+    id: version
+    attributes:
+      label: Signal-Version
+      description: Steht unter Einstellungen → Über Signal.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows-Version
+      placeholder: Windows 11 24H2

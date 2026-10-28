@@ -1,0 +1,15 @@
+name: Idee oder Wunsch
+description: Vorschlag für eine neue Funktion oder Verbesserung
+labels: [idee]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Was möchtest du erreichen?
+      description: Beschreibe die Situation, nicht nur die Lösung. Was nervt oder fehlt dir?
+    validations:
+      required: true
+  - type: textarea
+    id: vorschlag
+    attributes:
+      label: Wie könnte es aussehen?
