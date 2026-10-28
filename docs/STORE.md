@@ -10,9 +10,9 @@ Die Bildschirmfotos liegen in [`screenshots/`](screenshots/) (1440 × 900, erfü
 | App-Name (reservieren) | **Signal – IPTV-Player** (falls vergeben: „Signal IPTV“ oder „Signal TV Player“) |
 | Kategorie | Foto & Video |
 | Unterkategorie | – |
-| Datenschutzrichtlinie (URL) | `https://github.com/Leon510/signal/blob/main/PRIVACY.md` |
-| Website | `https://github.com/Leon510/signal` |
-| Support-Kontakt | `https://github.com/Leon510/signal/issues` |
+| Datenschutzrichtlinie (URL) | `https://github.com/Leon510/signal-iptv-player/blob/main/PRIVACY.md` |
+| Website | `https://github.com/Leon510/signal-iptv-player` |
+| Support-Kontakt | `https://github.com/Leon510/signal-iptv-player/issues` |
 | Copyright | © 2026 Leon |
 | Preis | Kostenlos |
 | Sprachen der Store-Seite | Deutsch (Hauptsprache), Englisch |

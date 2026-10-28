@@ -12,13 +12,13 @@
     "electron",
     "windows"
   ],
-  "homepage": "https://github.com/Leon510/signal",
+  "homepage": "https://github.com/Leon510/signal-iptv-player",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Leon510/signal.git"
+    "url": "https://github.com/Leon510/signal-iptv-player.git"
   },
   "bugs": {
-    "url": "https://github.com/Leon510/signal/issues"
+    "url": "https://github.com/Leon510/signal-iptv-player/issues"
   },
   "license": "MIT",
   "author": "Leon",

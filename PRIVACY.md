@@ -32,7 +32,7 @@ Signal prüft nicht selbstständig auf Updates und sendet keine Absturzberichte.
 ## Kontakt
 
 Fragen zum Datenschutz kannst du als Issue im GitHub-Projekt stellen:
-https://github.com/Leon510/signal/issues
+https://github.com/Leon510/signal-iptv-player/issues
 
 ---
 

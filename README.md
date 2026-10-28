@@ -27,7 +27,7 @@ Kabel- oder TV-Anbieter oder vom eigenen TV-Server. [Mehr dazu weiter unten.](#w
 
 ## Herunterladen
 
-Die aktuelle Version gibt es unter [**Releases**](https://github.com/Leon510/signal/releases/latest):
+Die aktuelle Version gibt es unter [**Releases**](https://github.com/Leon510/signal-iptv-player/releases/latest):
 
 - `Signal-Setup-x.y.z.exe`: Installer, legt Startmenü- und Desktop-Verknüpfung an
 - `Signal-x.y.z-portable.exe`: ohne Installation, z. B. für einen USB-Stick
@@ -111,7 +111,7 @@ Signal Foundation.
 
 ## Mitmachen
 
-Fehler und Ideen gern als [Issue](https://github.com/Leon510/signal/issues). Wie Signal aufgebaut ist und
+Fehler und Ideen gern als [Issue](https://github.com/Leon510/signal-iptv-player/issues). Wie Signal aufgebaut ist und
 wie du es selbst baust, steht in [docs/ENTWICKLUNG.md](docs/ENTWICKLUNG.md); Hinweise zum Mitarbeiten in
 [CONTRIBUTING.md](CONTRIBUTING.md). Sicherheitslücken bitte nicht öffentlich melden, sondern wie in
 [SECURITY.md](SECURITY.md) beschrieben.
@@ -132,5 +132,5 @@ groups, multiple playlists, a mini player and smooth playback on unreliable serv
 
 Signal ships **without any channels or content**. Use playlists you are legally entitled to, for example from
 your TV provider, your own router or receiver, or your own TV server. The user interface is currently German only.
-Downloads are on the [Releases](https://github.com/Leon510/signal/releases/latest) page.
+Downloads are on the [Releases](https://github.com/Leon510/signal-iptv-player/releases/latest) page.
 Signal is not affiliated with the Signal messenger or the Signal Foundation.

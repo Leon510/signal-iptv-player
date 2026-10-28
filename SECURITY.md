@@ -8,7 +8,7 @@ Sicherheitskorrekturen gibt es für die jeweils neueste Version von Signal.
 
 Bitte melde Sicherheitslücken **nicht** als öffentliches Issue. Nutze stattdessen die private Meldefunktion von
 GitHub: im Projekt unter **Security → Report a vulnerability**
-(https://github.com/Leon510/signal/security/advisories/new).
+(https://github.com/Leon510/signal-iptv-player/security/advisories/new).
 
 Hilfreich sind:
 

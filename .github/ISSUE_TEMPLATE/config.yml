@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Sicherheitslücke melden
-    url: https://github.com/Leon510/signal/security/advisories/new
+    url: https://github.com/Leon510/signal-iptv-player/security/advisories/new
     about: Bitte nicht öffentlich, sondern über die private Meldefunktion.
