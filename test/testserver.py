@@ -5,12 +5,16 @@
   - danach Echtzeit-Takt nach Durchschnittsbitrate
   - mit jitter=1: alle ~8 s eine Pause von 1-2,5 s, danach den Rückstand als Burst
   - mit loop=1: Datei endlos wiederholen (Zeitstempel springen dann zurück, wie bei echten Streams)
+  - mit limit=<n>: höchstens n gleichzeitige Verbindungen dieser Art, danach HTTP 403
+    (wie IPTV-Anbieter mit Verbindungslimit, für Multiview-Tests)
 """
-import os, re, sys, time, random, http.server, socketserver
+import os, re, sys, time, random, threading, http.server, socketserver
 from urllib.parse import urlparse, parse_qs
 
 ROOT = sys.argv[1]
 DURATION = 60.0  # Länge der Testdateien in Sekunden
+ACTIVE = {}      # Verbindungslimit: Gruppe -> Anzahl offener Streams
+LOCK = threading.Lock()
 
 
 class H(http.server.SimpleHTTPRequestHandler):
@@ -32,6 +36,22 @@ class H(http.server.SimpleHTTPRequestHandler):
         if not os.path.exists(path):
             s.send_error(404)
             return
+        limit = int(q.get('limit', ['0'])[0])
+        group = os.path.basename(u.path) + '|' + str(limit)
+        if limit:
+            with LOCK:
+                if ACTIVE.get(group, 0) >= limit:
+                    s.send_error(403, 'Max connections reached')
+                    return
+                ACTIVE[group] = ACTIVE.get(group, 0) + 1
+        try:
+            s.stream_body(path, q)
+        finally:
+            if limit:
+                with LOCK:
+                    ACTIVE[group] -= 1
+
+    def stream_body(s, path, q):
         jitter = q.get('jitter', ['0'])[0] == '1'
         loop = q.get('loop', ['0'])[0] == '1'
         data = open(path, 'rb').read()

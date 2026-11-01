@@ -68,7 +68,19 @@ module.exports = (win) => {
       await shot('06-auswahl');
       await js(`document.getElementById('groupsClose').click()`);
 
-      // 6) Über Signal
+      // 6) Multiview
+      await js(`document.querySelector('.row[data-i="0"]').click()`);
+      await wait(1500);
+      await js(`document.getElementById('mvOpenBtn').click()`);
+      await wait(300);
+      for (const i of [1, 3, 4]) { await js(`document.querySelector('.row[data-i="${i}"]').click()`); await wait(300); }
+      await js(`document.querySelector('.mv-tile[data-tile="0"] video').click()`);
+      await wait(5000);
+      await shot('08-multiview');
+      await js(`document.getElementById('mvExit').click()`);
+      await wait(500);
+
+      // 7) Über Signal
       await js(`document.getElementById('settingsBtn').click()`);
       await wait(200);
       await js(`document.getElementById('aboutBtn').click()`);

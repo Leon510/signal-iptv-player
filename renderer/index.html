@@ -66,7 +66,11 @@
         <span id="listCount" class="count"></span>
         <button class="btn ghost small guide-btn" id="guideOpenBtn" title="Programmübersicht (G)">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          Programm
+          <span class="lbl">Programm</span>
+        </button>
+        <button class="btn ghost small mv-btn" id="mvOpenBtn" title="Bis zu 4 Sender gleichzeitig (V)">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="3" y="4" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="13" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          <span class="lbl">Multiview</span>
         </button>
       </div>
       <p class="fav-hint" id="favHint" hidden>Zum Sortieren Sender ziehen oder <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> drücken.</p>
@@ -133,7 +137,43 @@
       </div>
     </section>
 
+    <div class="resizer" id="railResizer" role="separator" aria-orientation="vertical" tabindex="0"
+         aria-label="Breite der Kategorien ändern" title="Ziehen, um die Breite zu ändern. Doppelklick setzt zurück." hidden></div>
+    <div class="resizer" id="listResizer" role="separator" aria-orientation="vertical" tabindex="0"
+         aria-label="Breite der Senderliste ändern" title="Ziehen, um die Breite zu ändern. Doppelklick setzt zurück." hidden></div>
+
     <section class="stage" id="stage" hidden>
+      <!-- Multiview -->
+      <div class="mv" id="mv" hidden>
+        <div class="mv-head">
+          <h2>Multiview</h2>
+          <p class="mv-hint" id="mvHint"></p>
+          <div class="mv-layouts" role="radiogroup" aria-label="Aufteilung">
+            <button role="radio" data-mv-layout="2" title="Zwei nebeneinander">
+              <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="6" width="8" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="6" width="8" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            </button>
+            <button role="radio" data-mv-layout="4" title="Vier gleich groß">
+              <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="4" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="13" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            </button>
+            <button role="radio" data-mv-layout="1+3" title="Einer groß, drei klein">
+              <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="4" width="12" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="17" y="4" width="4" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="17" y="10" width="4" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="17" y="16" width="4" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </button>
+          </div>
+          <div class="volume">
+            <button class="icon-btn" id="mvMuteBtn" aria-label="Ton aus">
+              <svg class="i-vol" viewBox="0 0 24 24" width="18" height="18"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <svg class="i-mute" viewBox="0 0 24 24" width="18" height="18"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z" fill="currentColor"/><path d="m16 9.5 5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+            <input type="range" id="mvVolume" min="0" max="1" step="0.02" aria-label="Lautstärke">
+          </div>
+          <button class="icon-btn" id="mvFsBtn" aria-label="Vollbild" title="Vollbild (F)">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="btn ghost small" id="mvExit" title="Multiview beenden (V)">Beenden</button>
+        </div>
+        <div class="mv-grid" id="mvGrid" data-layout="4"></div>
+      </div>
+
       <div class="screen" id="screen">
         <video id="video" playsinline></video>
 
@@ -145,6 +185,7 @@
             <li><kbd>H</kbd> Sender ausblenden</li>
             <li><kbd>A</kbd> Tonspur wechseln</li>
             <li><kbd>G</kbd> Programmübersicht</li>
+            <li><kbd>V</kbd> Multiview, bis zu 4 Sender</li>
             <li><kbd>Rücktaste</kbd> vorheriger Sender</li>
             <li><kbd>F</kbd> Vollbild</li>
           </ul>
@@ -232,6 +273,9 @@
               Tonspur
             </button>
             <button class="btn ghost small" id="vlcBtn" title="Stream extern in VLC öffnen">In VLC öffnen</button>
+            <button class="icon-btn live-only" id="mvCtrlBtn" aria-label="Multiview" title="Multiview, bis zu 4 Sender gleichzeitig (V)">
+              <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="4" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="13" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            </button>
             <button class="icon-btn" id="miniBtn" aria-label="Mini-Player" title="Mini-Player, bleibt im Vordergrund (P)">
               <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor"/></svg>
             </button>

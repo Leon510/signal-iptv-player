@@ -263,4 +263,14 @@ for k in range(1, 4):
              f'{B}/series/u/p/20{k}.mp4?demo={k}']
 write('demo.m3u', demo)
 
+mvlist = ['#EXTM3U']
+MV_NAMES = ['Nordlicht', 'Kanal Mitte', 'Elbe TV', 'Weitblick', 'Prisma',
+            'Ein Sender mit einem sehr langen Namen zum Testen der Spaltenbreite HD']
+for i, n in enumerate(MV_NAMES):
+    mvlist += [f'#EXTINF:-1 tvg-logo="{B}/demo/logo{i}.png" group-title="Multiview",{n}',
+               f'{B}/stream/aac.ts?loop=1&burst=3&mv={i}']
+for i in range(4):
+    mvlist += [f'#EXTINF:-1 group-title="Mit Limit",Limit-Sender {i + 1}', f'{B}/stream/aac.ts?loop=1&burst=3&limit=2&lim={i}']
+write('mv.m3u', mvlist)
+
 print(f'Fertig: {OUT}')

@@ -27,7 +27,11 @@ Dabei erhalten diese Server technisch bedingt deine IP-Adresse und die Angaben, 
 mitschickt (z. B. den eingestellten User-Agent). Für diese Server ist ihr jeweiliger Betreiber verantwortlich,
 nicht der Entwickler von Signal.
 
-Signal prüft nicht selbstständig auf Updates und sendet keine Absturzberichte.
+Playlisten, die du per Link hinzugefügt hast, lädt Signal einmal am Tag neu (abschaltbar unter
+Einstellungen → Playlisten automatisch aktualisieren), den Programmführer etwa alle 12 Stunden.
+Dabei werden nur die Server deines Anbieters bzw. Programmführers kontaktiert.
+
+Signal prüft nicht selbstständig, ob es eine neue Version von Signal gibt, und sendet keine Absturzberichte.
 
 ## Kontakt
 

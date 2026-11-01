@@ -117,12 +117,16 @@
     for (const k of ['lastSection', 'hidden', 'progress']) if (!store[k]) store[k] = {};
     if (!store.buffer) store.buffer = 'normal';
     if (!store.autoRefresh) store.autoRefresh = 'daily';
+    if (!store.columns) store.columns = {};
+    if (!store.mvLayout) store.mvLayout = '4';
     if (!store.epgInfo) store.epgInfo = {};
     if (!store.audioLang) store.audioLang = canonLang((navigator.language || '').split('-')[0]) || '';
     await api.setUserAgent(store.userAgent);
     document.body.classList.add('platform-' + api.platform);
     bindUI();
     setupPlayerUI();
+    setupResizers();
+    setupMultiview();
     if (store.playlists.length) {
       if (!activePlaylist()) store.activeId = store.playlists[0].id;
       await openPlaylist(store.activeId);
@@ -134,7 +138,9 @@
   function showWelcome() {
     $('layout').classList.add('is-welcome');
     $('welcome').hidden = false;
+    if (mv.on) closeMultiview({ keep: false });
     for (const id of ['rail', 'listPane', 'vodPane', 'stage', 'playlistSwitch', 'searchWrap', 'sections']) $(id).hidden = true;
+    updateResizers();
     player.stop();
     setTimeout(() => $('welcomeUrl').focus(), 50);
   }
@@ -221,6 +227,7 @@
 
   async function openPlaylist(id, { keepSection = false, skipAutoRefresh = false } = {}) {
     const prevSection = section;
+    if (mv.on) closeMultiview({ keep: false });
     let data = await api.loadChannels(id);
     if (!data) {
       try { await refreshPlaylist(id); return; } catch (e) {
@@ -345,6 +352,7 @@
 
   function setSection(sec) {
     if (sec === section) return;
+    if (mv.on) closeMultiview({ keep: false });
     closeGuide(true);
     if (playingKind === 'vod') closeVod();
     if (section === 'live' && sec !== 'live' && playingKind === 'live') {
@@ -367,6 +375,7 @@
     renderSectionTabs();
     renderRail();
     applyFilter();
+    updateResizers();
     saveStore();
   }
 
@@ -574,7 +583,7 @@
       const c = all[i];
       const cls = ['row'];
       if (i === selected) cls.push('selected');
-      if (i === playing) cls.push('playing');
+      if (mv.on ? mvIndexOf(i) >= 0 : i === playing) cls.push('playing');
       const isFav = fav.has(c.url);
       const logo = c.logo
         ? `<img src="${esc(c.logo)}" alt="" loading="lazy" decoding="async" data-fallback="${esc(initials(c.name))}">`
@@ -584,15 +593,19 @@
         ? `<span class="grp epg"><span class="epg-title">${esc(nn.now[2])}</span><span class="epg-bar"><span style="width:${progPct(nn.now, nowT).toFixed(1)}%"></span></span></span>`
         : `<span class="grp">${esc(c.group)}</span>`;
       if (favMode) cls.push('draggable');
-      html += `<div class="${cls.join(' ')}" style="top:${pos * ROW_H}px" data-i="${i}" role="button" aria-label="${esc(c.name)} abspielen"${favMode ? ' draggable="true"' : ''}` +
-        `${nn && nn.now ? ` title="${esc(hm(nn.now[0]))}–${esc(hm(nn.now[1]))} ${esc(nn.now[2])}${nn.next ? `\nDanach ${esc(hm(nn.next[0]))} ${esc(nn.next[2])}` : ''}"` : ''}>` +
+      if (isFav) cls.push('fav');
+      // Tooltip: voller Name, dazu laufende und nächste Sendung
+      let tip = c.name;
+      if (nn && nn.now) tip += `\n${hm(nn.now[0])}–${hm(nn.now[1])} ${nn.now[2]}${nn.next ? `\nDanach ${hm(nn.next[0])} ${nn.next[2]}` : ''}`;
+      html += `<div class="${cls.join(' ')}" style="top:${pos * ROW_H}px" data-i="${i}" role="button" aria-label="${esc(c.name)} abspielen"${favMode ? ' draggable="true"' : ''} title="${esc(tip)}">` +
         `<span class="num">${numberOf.get(i)}</span>` +
         `<span class="logo">${logo}</span>` +
         `<span class="meta"><span class="name">${esc(c.name)}</span>${sub}</span>` +
+        `<span class="row-actions">` +
         `<button class="row-btn hide" data-hide="${i}" aria-label="Sender ausblenden" title="Ausblenden (H)">${EYE_OFF}</button>` +
         `<button class="row-btn star${isFav ? ' on' : ''}" data-star="${i}" aria-label="${isFav ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}" title="Favorit (S)">` +
         `<svg viewBox="0 0 24 24" width="16" height="16"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>` +
-        `</button></div>`;
+        `</button></span></div>`;
     }
     scroll.querySelectorAll('.row').forEach((r) => r.remove());
     scroll.insertAdjacentHTML('beforeend', html);
@@ -889,6 +902,7 @@
     if (!epgOf.size) return;
     if (section === 'live' && !guideOpen) renderList();
     if (guideOpen) updateNowLine();
+    if (mv.on) renderMv();
   }, 30000);
 
   // ---------- Programmübersicht (Zeitraster) ----------
@@ -913,6 +927,7 @@
     guideStart = start.getTime();
     guideEnd = guideStart + 4 * 24 * 3600e3;
     $('guideCanvas').style.width = G_CH + gx(guideEnd) + 'px';
+    updateResizers();
     renderGuide(true);
     scrollGuideTo(now - 30 * 60000);
     // Laufender Sender oben sichtbar
@@ -937,6 +952,7 @@
       $('stage').hidden = false;
       renderList();
     }
+    updateResizers();
   }
 
   function scrollGuideTo(t) {
@@ -1050,6 +1066,7 @@
   let prevChannel = -1;
   function tune(i, { fromZap = false } = {}) {
     if (i < 0 || i >= all.length) return;
+    if (mv.on) { mvPick(i); return; }
     const c = all[i];
     if (playing >= 0 && playingKind === 'live' && playing !== i) prevChannel = playing;
     playing = i;
@@ -1072,6 +1089,7 @@
   }
 
   function zapBack() {
+    if (mv.on) return;
     if (prevChannel < 0 || isHidden(prevChannel)) { toast('Noch kein vorheriger Sender'); return; }
     if (!visible.includes(prevChannel)) { filters.live = 'all'; query = ''; $('search').value = ''; renderRail(); applyFilter(); }
     tune(prevChannel, { fromZap: true });
@@ -1079,6 +1097,7 @@
 
   function zap(delta) {
     if (!visible.length || section !== 'live') return;
+    if (mv.on) { mvZap(delta); return; }
     const base = playing >= 0 && visible.includes(playing) ? playing : selected;
     let pos = visible.indexOf(base);
     pos = pos < 0 ? 0 : (pos + delta + visible.length) % visible.length;
@@ -1688,6 +1707,528 @@
     if (state === 'error') $('errorDetail').textContent = detail || '';
   }
 
+  // ---------- Spaltenbreiten (ziehbare Trenner) ----------
+  const COL_LIMITS = { rail: [150, 380], list: [260, 760] };
+
+  function colWidth(key) {
+    return Math.round((key === 'rail' ? $('rail') : $('listPane')).getBoundingClientRect().width);
+  }
+
+  // Gespeicherte Breiten anwenden; auf kleinen Fenstern so begrenzen, dass der Player Platz behält
+  function applyColumnWidths() {
+    const cols = store.columns || {};
+    const layout = $('layout');
+    const railMax = Math.max(COL_LIMITS.rail[0], Math.min(COL_LIMITS.rail[1], window.innerWidth * 0.3));
+    const rail = cols.rail ? Math.max(COL_LIMITS.rail[0], Math.min(cols.rail, railMax)) : null;
+    if (rail) layout.style.setProperty('--rail-w', rail + 'px'); else layout.style.removeProperty('--rail-w');
+    const railNow = rail || colWidth('rail') || 210;
+    const listMax = Math.max(COL_LIMITS.list[0], Math.min(COL_LIMITS.list[1], window.innerWidth - railNow - 420));
+    const list = cols.list ? Math.max(COL_LIMITS.list[0], Math.min(cols.list, listMax)) : null;
+    if (list) layout.style.setProperty('--list-w', list + 'px'); else layout.style.removeProperty('--list-w');
+  }
+
+  function setColumnWidth(key, px, save) {
+    if (!store.columns) store.columns = {};
+    const [min, max] = COL_LIMITS[key];
+    store.columns[key] = Math.round(Math.max(min, Math.min(max, px)));
+    applyColumnWidths();
+    if (save) saveStore();
+  }
+
+  function updateResizers() {
+    const welcome = !$('welcome').hidden;
+    $('railResizer').hidden = welcome || $('rail').hidden;
+    $('listResizer').hidden = welcome || section !== 'live' || guideOpen || $('listPane').hidden;
+  }
+
+  function setupResizers() {
+    for (const [id, key] of [['railResizer', 'rail'], ['listResizer', 'list']]) {
+      const h = $(id);
+      h.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        h.setPointerCapture(e.pointerId);
+        const startX = e.clientX, startW = colWidth(key);
+        document.body.classList.add('resizing');
+        h.classList.add('active');
+        const move = (ev) => setColumnWidth(key, startW + ev.clientX - startX, false);
+        const up = () => {
+          h.removeEventListener('pointermove', move);
+          h.removeEventListener('pointerup', up);
+          h.removeEventListener('pointercancel', up);
+          document.body.classList.remove('resizing');
+          h.classList.remove('active');
+          saveStore();
+        };
+        h.addEventListener('pointermove', move);
+        h.addEventListener('pointerup', up);
+        h.addEventListener('pointercancel', up);
+      });
+      h.addEventListener('dblclick', () => {
+        if (store.columns) delete store.columns[key];
+        applyColumnWidths();
+        saveStore();
+        toast('Breite zurückgesetzt');
+      });
+      h.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        e.stopPropagation();
+        setColumnWidth(key, colWidth(key) + (e.key === 'ArrowRight' ? 20 : -20), true);
+      });
+    }
+    window.addEventListener('resize', applyColumnWidths);
+    applyColumnWidths();
+  }
+
+  // ---------- Multiview ----------
+  // Bis zu 4 Sender gleichzeitig. Jedes Feld hat einen eigenen Player. Das markierte Feld bekommt den
+  // nächsten Sender aus der Liste; Ton kommt nur aus einem Feld (Lautsprecher-Symbol).
+  const MV_SLOTS = { '2': 2, '4': 4, '1+3': 4 };
+  const mv = { on: false, tiles: [], sel: 0, audio: -1 };
+  const mvSlots = () => MV_SLOTS[store.mvLayout] || 4;
+  const mvFilled = () => mv.tiles.filter((t, k) => k < mvSlots() && t.entry >= 0).length;
+  const mvIndexOf = (i) => mv.tiles.findIndex((t, k) => k < mvSlots() && t.entry === i);
+
+  const SPEAKER = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  function bufferAheadOf(v) {
+    const b = v.buffered, t = v.currentTime;
+    for (let i = 0; i < b.length; i++) if (b.start(i) <= t + 0.05 && b.end(i) > t) return b.end(i) - t;
+    return 0;
+  }
+  function gapTargetOf(v) {
+    const b = v.buffered, t = v.currentTime;
+    for (let i = 0; i < b.length; i++) if (b.start(i) <= t + 0.05 && b.end(i) > t + 0.1) return null;
+    for (let i = 0; i < b.length; i++) if (b.start(i) > t && b.start(i) - t < 6) return b.start(i) + 0.05;
+    return null;
+  }
+
+  function explainTile(errors) {
+    const s = errors.join(' ');
+    const others = mv.tiles.filter((t) => t.entry >= 0 && t.started).length;
+    // Viele Anbieter lehnen weitere gleichzeitige Verbindungen mit 403/429/458/509 ab oder brechen sie sofort ab
+    if (/http-(401|403|429|456|458|503|509)/.test(s) || (others > 0 && /timeout|EarlyEof|early|unstable/i.test(s))) {
+      return 'Der Anbieter lässt hier keinen weiteren Stream zu. Viele erlauben nur 1–2 Verbindungen gleichzeitig.';
+    }
+    if (s.includes('timeout')) return 'Der Sender liefert kein Bild. Vielleicht ist er gerade offline.';
+    return explain(errors);
+  }
+
+  class TilePlayer {
+    constructor(k) {
+      this.k = k;
+      this.entry = -1;
+      this.url = '';
+      this.token = 0;
+      this.hls = null;
+      this.ts = null;
+      this.order = [];
+      this.step = 0;
+      this.started = false;
+      this.errors = [];
+      this.reconnects = [];
+      this.holding = false;
+      this.holdSince = 0;
+      this.bufTarget = 2;
+      this.lastTime = 0;
+      this.lastAdvanceAt = 0;
+      const el = document.createElement('div');
+      el.className = 'mv-tile empty';
+      el.dataset.tile = k;
+      el.innerHTML =
+        '<video playsinline muted></video>' +
+        '<button class="mv-empty" data-mv-act="select"><span class="mv-plus" aria-hidden="true">+</span>' +
+        '<span class="mv-empty-text">Sender hinzufügen</span><small>Feld markieren und links einen Sender wählen</small></button>' +
+        '<div class="spinner" hidden><span></span></div>' +
+        '<div class="mv-error" hidden><p></p><button class="btn ghost small" data-mv-act="retry">Erneut versuchen</button></div>' +
+        '<div class="mv-bar"><span class="mv-num"></span><span class="mv-text"><span class="mv-name"></span><span class="mv-prog"></span></span>' +
+        `<span class="mv-sound" title="Ton kommt aus diesem Feld">${SPEAKER}</span>` +
+        '<button class="icon-btn mv-close" data-mv-act="close" aria-label="Feld leeren" title="Feld leeren">' +
+        '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>';
+      this.el = el;
+      this.video = el.querySelector('video');
+      const v = this.video;
+      v.addEventListener('playing', () => {
+        this.started = true;
+        clearTimeout(this.watchdog);
+        this.state('playing');
+      });
+      v.addEventListener('waiting', () => { if (this.started && !this.holding) this.state('loading'); });
+      v.addEventListener('canplay', () => { if (this.started && !this.holding) this.state('playing'); });
+      v.addEventListener('error', () => {
+        if (this.url && this.order[this.step] === 'native' && !this.hls && !this.ts) this.fail('native');
+      });
+    }
+
+    state(s, detail) {
+      this.el.querySelector('.spinner').hidden = s !== 'loading';
+      const err = this.el.querySelector('.mv-error');
+      err.hidden = s !== 'error';
+      if (s === 'error') err.querySelector('p').textContent = detail || '';
+    }
+
+    load(entry) {
+      this.token++;
+      this.destroy();
+      this.entry = entry;
+      this.url = all[entry].url;
+      this.order = player.guess(this.url);
+      this.step = 0;
+      this.started = false;
+      this.errors = [];
+      this.reconnects = [];
+      this.bufTarget = Math.max(1.5, BUFFER_PRESETS[store.buffer] || BUFFER_PRESETS.normal);
+      this.state('loading');
+      this.attempt();
+    }
+
+    clear() {
+      this.token++;
+      this.destroy();
+      this.entry = -1;
+      this.url = '';
+      this.started = false;
+      this.state('idle');
+    }
+
+    destroy() {
+      clearTimeout(this.watchdog);
+      this.holding = false;
+      if (this.hls) { try { this.hls.destroy(); } catch {} this.hls = null; }
+      if (this.ts) {
+        try { this.ts.pause(); this.ts.unload(); this.ts.detachMediaElement(); this.ts.destroy(); } catch {}
+        this.ts = null;
+      }
+      this.video.removeAttribute('src');
+      try { this.video.load(); } catch {}
+    }
+
+    fail(reason) {
+      const token = this.token;
+      this.errors.push(reason);
+      if (this.started) {
+        const now = Date.now();
+        this.reconnects = this.reconnects.filter((t) => now - t < 60000);
+        this.reconnects.push(now);
+        this.started = false;
+        this.destroy();
+        if (this.reconnects.length > 5) { this.state('error', explainTile(this.errors.concat('unstable'))); renderMv(); return; }
+        this.state('loading');
+        setTimeout(() => { if (token === this.token) this.attempt(); }, 800);
+        return;
+      }
+      this.step++;
+      this.destroy();
+      if (this.step < this.order.length) this.attempt();
+      else { this.state('error', explainTile(this.errors)); renderMv(); }
+    }
+
+    hold() {
+      this.holding = true;
+      this.holdSince = performance.now();
+      if (!this.video.paused) this.video.pause();
+      this.state('loading');
+    }
+
+    release() {
+      this.holding = false;
+      this.lastAdvanceAt = performance.now();
+      this.lastTime = this.video.currentTime;
+      this.video.play().catch(() => {});
+    }
+
+    attempt() {
+      const token = this.token;
+      const engine = this.order[this.step];
+      const v = this.video;
+      const failed = (r) => { if (token === this.token) this.fail(r); };
+      const langs = langAliases(store.audioLang);
+      clearTimeout(this.watchdog);
+      this.watchdog = setTimeout(() => { if (!this.started) failed('timeout'); }, 15000);
+
+      if (engine === 'hls') {
+        if (!window.Hls || !Hls.isSupported()) return failed('hls-unsupported');
+        const hls = new Hls({
+          lowLatencyMode: false, backBufferLength: 10, maxBufferLength: 20, maxMaxBufferLength: 30,
+          liveSyncDurationCount: 3, maxBufferHole: 0.5, nudgeMaxRetry: 6, startFragPrefetch: true,
+          fragLoadingMaxRetry: 6, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4,
+          // Kleine Felder brauchen keine volle Auflösung: spart Bandbreite bei 4 Streams
+          capLevelToPlayerSize: true,
+        });
+        this.hls = hls;
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          if (!data.fatal) return;
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && this.started) { hls.recoverMediaError(); return; }
+          failed(data.response && data.response.code ? 'http-' + data.response.code : data.details || 'hls');
+        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (langs.length && hls.audioTracks.length > 1) {
+            const idx = hls.audioTracks.findIndex((t) => langs.includes(canonLang(t.lang)));
+            if (idx >= 0 && idx !== hls.audioTrack) hls.audioTrack = idx;
+          }
+          v.play().catch(() => {});
+        });
+        hls.loadSource(this.url);
+        hls.attachMedia(v);
+      } else if (engine === 'ts') {
+        if (!window.mpegts || !mpegts.isSupported()) return failed('ts-unsupported');
+        const p = mpegts.createPlayer(
+          { type: 'mpegts', isLive: true, url: this.url },
+          {
+            isLive: true, enableWorker: true, lazyLoad: false,
+            liveBufferLatencyChasing: false, liveSync: false, enableStashBuffer: true,
+            autoCleanupSourceBuffer: true, autoCleanupMaxBackwardDuration: 30, autoCleanupMinBackwardDuration: 15,
+            audioCodecSupport: AUDIO_SUPPORT, audioLanguages: langs, discontinuityThreshold: 1000,
+          }
+        );
+        this.ts = p;
+        p.on(mpegts.Events.ERROR, (type, detail, info) => failed(info && info.code ? 'http-' + info.code : detail || type));
+        p.attachMediaElement(v);
+        p.load();
+        this.hold();
+      } else {
+        v.src = this.url;
+        v.play().catch(() => {});
+      }
+    }
+
+    // Puffer-Wächter wie beim Hauptplayer, nur für Live-TS
+    tick(now) {
+      if (!this.url || !this.ts || this.order[this.step] !== 'ts') return;
+      const v = this.video;
+      const ahead = bufferAheadOf(v);
+      const gap = gapTargetOf(v);
+      if (this.holding) {
+        if (gap !== null && ahead < 0.1) { v.currentTime = gap; return; }
+        const waited = now - this.holdSince;
+        if (ahead >= this.bufTarget || (waited > 6000 && ahead > 0.4)) this.release();
+        else if (this.started && waited > 12000) this.fail('stall');
+        return;
+      }
+      if (gap !== null && ahead < 0.1) { v.currentTime = gap; return; }
+      if (ahead < 0.08 && v.readyState < 3) {
+        this.bufTarget = Math.min(this.bufTarget + 1, 6);
+        this.hold();
+        return;
+      }
+      if (Math.abs(v.currentTime - this.lastTime) > 0.01) {
+        this.lastTime = v.currentTime;
+        this.lastAdvanceAt = now;
+      } else if (now - this.lastAdvanceAt > 3000) {
+        if (ahead > 0.5) { v.currentTime += 0.05; this.lastAdvanceAt = now; }
+        else if (now - this.lastAdvanceAt > 10000) this.fail('stall');
+      }
+      if (ahead > this.bufTarget + 20) v.playbackRate = 1.08;
+      else if (v.playbackRate !== 1 && ahead < this.bufTarget + 4) v.playbackRate = 1;
+    }
+  }
+
+  setInterval(() => {
+    if (!mv.on) return;
+    const now = performance.now();
+    for (const t of mv.tiles) t.tick(now);
+  }, 250);
+
+  function mvEnsureTiles() {
+    if (mv.tiles.length) return;
+    const grid = $('mvGrid');
+    for (let k = 0; k < 4; k++) {
+      const t = new TilePlayer(k);
+      mv.tiles.push(t);
+      grid.appendChild(t.el);
+    }
+  }
+
+  // Ton nur aus dem Feld mit dem Lautsprecher
+  function mvApplyAudio() {
+    mv.tiles.forEach((t, k) => {
+      t.video.volume = store.volume;
+      t.video.muted = store.muted || k !== mv.audio;
+    });
+    $('mvVolume').value = store.volume;
+    $('mvMuteBtn').classList.toggle('muted', store.muted);
+  }
+
+  function mvNextEmpty(from) {
+    const n2 = mvSlots();
+    for (let d = 0; d < n2; d++) {
+      const k = (from + d) % n2;
+      if (mv.tiles[k].entry < 0) return k;
+    }
+    return -1;
+  }
+
+  function renderMv() {
+    if (!mv.on) return;
+    const n2 = mvSlots();
+    const nowT = Date.now();
+    $('mvGrid').dataset.layout = store.mvLayout;
+    $('mv').querySelectorAll('[data-mv-layout]').forEach((b) =>
+      b.setAttribute('aria-checked', String(b.dataset.mvLayout === store.mvLayout)));
+    mv.tiles.forEach((t, k) => {
+      const el = t.el;
+      el.hidden = k >= n2;
+      const filled = t.entry >= 0;
+      el.classList.toggle('empty', !filled);
+      el.classList.toggle('sel', k === mv.sel);
+      el.classList.toggle('audio', filled && k === mv.audio);
+      if (!filled) return;
+      const c = all[t.entry];
+      el.querySelector('.mv-num').textContent = numberOf.get(t.entry) ?? '';
+      el.querySelector('.mv-name').textContent = c.name;
+      const nn = epgOf.size ? nowNext(t.entry, nowT) : null;
+      el.querySelector('.mv-prog').textContent = nn && nn.now ? nn.now[2] : '';
+    });
+    const filled = mvFilled();
+    $('mvHint').textContent = filled === 0
+      ? 'Wähle links einen Sender für das markierte Feld.'
+      : mv.tiles[mv.sel] && mv.tiles[mv.sel].entry < 0
+        ? 'Der nächste Sender kommt ins markierte Feld.'
+        : 'Ein Sender aus der Liste ersetzt das markierte Feld.';
+    renderList();
+  }
+
+  function mvSelect(k) {
+    mv.sel = k;
+    if (mv.tiles[k].entry >= 0) mv.audio = k;
+    mvApplyAudio();
+    renderMv();
+  }
+
+  // Sender aus der Liste ins markierte Feld legen
+  function mvPick(i) {
+    if (i < 0 || i >= all.length) return;
+    const existing = mvIndexOf(i);
+    if (existing >= 0) { mvSelect(existing); return; }
+    const k = mv.sel >= 0 && mv.sel < mvSlots() ? mv.sel : 0;
+    const wasEmpty = mv.tiles[k].entry < 0;
+    mv.tiles[k].load(i);
+    selected = i;
+    if (!wasEmpty || mv.audio < 0) mv.audio = k;
+    // Weiter zum nächsten freien Feld, damit man der Reihe nach füllen kann
+    if (wasEmpty) {
+      const next = mvNextEmpty(k + 1);
+      if (next >= 0) mv.sel = next;
+    }
+    store.lastChannel[pid()] = all[i].url;
+    saveStore();
+    mvApplyAudio();
+    renderMv();
+  }
+
+  function mvClose(k) {
+    const t = mv.tiles[k];
+    if (t.entry < 0) return;
+    t.clear();
+    mv.sel = k;
+    if (mv.audio === k) {
+      mv.audio = mv.tiles.findIndex((x, j) => j < mvSlots() && x.entry >= 0);
+    }
+    mvApplyAudio();
+    renderMv();
+  }
+
+  // Im Multiview: ↑/↓ im Vollbild schaltet das Feld mit dem Ton um
+  function mvZap(delta) {
+    const k = mv.audio >= 0 ? mv.audio : mv.sel;
+    const t = mv.tiles[k];
+    if (!visible.length) return;
+    let pos = t && t.entry >= 0 ? visible.indexOf(t.entry) : -1;
+    let tries = visible.length;
+    do {
+      pos = pos < 0 ? 0 : (pos + delta + visible.length) % visible.length;
+    } while (mvIndexOf(visible[pos]) >= 0 && --tries > 0);
+    mv.sel = k;
+    mvPick(visible[pos]);
+  }
+
+  function setMvLayout(layout) {
+    if (!MV_SLOTS[layout]) return;
+    const before = mvSlots();
+    store.mvLayout = layout;
+    saveStore();
+    const n2 = mvSlots();
+    if (n2 < before) {
+      // Felder, die nicht mehr sichtbar sind, schließen, damit sie keine Verbindung belegen
+      let closed = 0;
+      for (let k = n2; k < before; k++) if (mv.tiles[k].entry >= 0) { mv.tiles[k].clear(); closed++; }
+      if (mv.sel >= n2) mv.sel = 0;
+      if (mv.audio >= n2) mv.audio = mv.tiles.findIndex((x, j) => j < n2 && x.entry >= 0);
+      if (closed) toast(`${closed === 1 ? 'Ein Feld' : `${closed} Felder`} geschlossen`);
+    } else if (mv.tiles[mv.sel] && mv.tiles[mv.sel].entry >= 0) {
+      const next = mvNextEmpty(0);
+      if (next >= 0) mv.sel = next;
+    }
+    mvApplyAudio();
+    renderMv();
+  }
+
+  function openMultiview() {
+    if (mv.on || section !== 'live') return;
+    if (document.body.classList.contains('mini')) toggleMini(false);
+    if (guideOpen) closeGuide();
+    const first = playingKind === 'live' && playing >= 0 ? playing : -1;
+    player.stop();
+    playing = -1;
+    playingKind = null;
+    $('osd').classList.remove('show');
+    closeAudioMenu();
+    mvEnsureTiles();
+    if (!MV_SLOTS[store.mvLayout]) store.mvLayout = '4';
+    mv.on = true;
+    mv.sel = 0;
+    mv.audio = -1;
+    document.body.classList.add('mv-on');
+    $('mv').hidden = false;
+    $('stage').hidden = false;
+    if (first >= 0) mvPick(first);
+    mvApplyAudio();
+    renderMv();
+  }
+
+  // Beenden: der Sender mit Ton läuft danach groß weiter (oder ein bestimmtes Feld)
+  function closeMultiview({ keep = true, tile = -1 } = {}) {
+    if (!mv.on) return;
+    const k = tile >= 0 ? tile : mv.audio;
+    const entry = keep && k >= 0 && mv.tiles[k] ? mv.tiles[k].entry : -1;
+    for (const t of mv.tiles) t.clear();
+    mv.on = false;
+    mv.audio = -1;
+    document.body.classList.remove('mv-on');
+    $('mv').hidden = true;
+    renderList();
+    if (entry >= 0) tune(entry);
+  }
+
+  function setupMultiview() {
+    $('mvOpenBtn').addEventListener('click', openMultiview);
+    $('mvCtrlBtn').addEventListener('click', openMultiview);
+    $('mvExit').addEventListener('click', () => closeMultiview());
+    $('mvFsBtn').addEventListener('click', () => toggleFullscreen());
+    $('mvVolume').addEventListener('input', (e) => setVolume(parseFloat(e.target.value)));
+    $('mvMuteBtn').addEventListener('click', () => setMuted(!store.muted));
+    $('mv').querySelectorAll('[data-mv-layout]').forEach((b) =>
+      b.addEventListener('click', () => setMvLayout(b.dataset.mvLayout)));
+    const grid = $('mvGrid');
+    grid.addEventListener('click', (e) => {
+      const tileEl = e.target.closest('.mv-tile');
+      if (!tileEl) return;
+      const k = +tileEl.dataset.tile;
+      const act = e.target.closest('[data-mv-act]');
+      if (act && act.dataset.mvAct === 'close') { e.stopPropagation(); mvClose(k); return; }
+      if (act && act.dataset.mvAct === 'retry') { e.stopPropagation(); mv.tiles[k].load(mv.tiles[k].entry); return; }
+      mvSelect(k);
+    });
+    grid.addEventListener('dblclick', (e) => {
+      const tileEl = e.target.closest('.mv-tile');
+      if (!tileEl || e.target.closest('[data-mv-act="close"]')) return;
+      const k = +tileEl.dataset.tile;
+      if (mv.tiles[k].entry >= 0) closeMultiview({ tile: k });
+    });
+    grid.addEventListener('wheel', (e) => { setVolume(store.volume - Math.sign(e.deltaY) * 0.05); }, { passive: true });
+  }
+
   // ---------- Spulen ----------
   let seeking = false;
   // Zeitfenster für Live-Zurückspulen: [ältester gepufferter Moment, Live-Kante]
@@ -1765,6 +2306,7 @@
     video.volume = store.volume;
     $('volume').value = store.volume;
     if (store.volume > 0 && store.muted) setMuted(false);
+    if (mv.on) mvApplyAudio();
     saveStore();
   }
   function setMuted(m) {
@@ -1772,6 +2314,7 @@
     video.muted = m;
     $('muteBtn').classList.toggle('muted', m);
     $('muteBtn').setAttribute('aria-label', m ? 'Ton an' : 'Ton aus');
+    if (mv.on) mvApplyAudio();
     saveStore();
   }
   function togglePause() {
@@ -1787,6 +2330,7 @@
   }
   async function toggleMini(value) {
     const on = value ?? !document.body.classList.contains('mini');
+    if (on && mv.on) { toast('Der Mini-Player geht im Multiview nicht. Beende zuerst den Multiview.'); return; }
     if (on && playing < 0) { toast('Starte zuerst einen Sender oder Film'); return; }
     if (on) closeAudioMenu();
     document.body.classList.toggle('mini', on);
@@ -2344,6 +2888,14 @@
       return;
     }
 
+    // Multiview
+    if (mv.on) {
+      if (e.key === 'v' || e.key === 'V') { closeMultiview(); return; }
+      if (e.key === 'Escape') { if (fs) toggleFullscreen(false); else closeMultiview(); return; }
+      if (e.altKey && /^[1-4]$/.test(e.key) && +e.key <= mvSlots()) { e.preventDefault(); mvSelect(+e.key - 1); return; }
+      if ([' ', 'a', 'A', 'Backspace', 'ArrowLeft', 'ArrowRight', 'i', 'I'].includes(e.key)) { e.preventDefault(); return; }
+    }
+
     // Film oder Folge läuft
     if (playingKind === 'vod') {
       switch (e.key) {
@@ -2398,6 +2950,7 @@
       case 'ArrowLeft': skip(e.shiftKey ? -60 : -10); break;
       case 'Backspace': e.preventDefault(); zapBack(); break;
       case 'g': case 'G': if (!fs) openGuide(); break;
+      case 'v': case 'V': openMultiview(); break;
       case 'a': case 'A': cycleAudioTrack(); wakeUI(); break;
       case 'i': case 'I': if (playing >= 0) showOsd(numberOf.get(playing), all[playing].name, all[playing].group, false, playing); break;
     }
@@ -2471,7 +3024,12 @@
   }
 
   // Für den automatischen Test (test/bench.js): Zustand des Players auslesen
-  window.__signalDebug = () => ({ tracks: player.audioTracks, bufTarget: player.bufTarget, engine: player.engine, holding: player.holding,
+  window.__signalDebug = () => ({
+    mv: { on: mv.on, layout: store.mvLayout, sel: mv.sel, audio: mv.audio,
+      tiles: mv.tiles.map((t) => ({ name: t.entry >= 0 ? all[t.entry].name : null, t: +t.video.currentTime.toFixed(1), muted: t.video.muted, started: t.started,
+        error: t.el.querySelector('.mv-error').hidden ? null : t.el.querySelector('.mv-error p').textContent })) },
+    columns: { rail: colWidth('rail'), list: colWidth('list'), stored: store.columns },
+    tracks: player.audioTracks, bufTarget: player.bufTarget, engine: player.engine, holding: player.holding,
     epgMatched: epgMatchedCount(), playing, playingName: playing >= 0 ? all[playing].name : null, prevChannel, timeshift: !!player.timeshift,
     favorites: (store.favorites[pid()] || []).map((u) => (all.find((c) => c.url === u) || {}).name), playlists: store.playlists.map((p) => p.name) });
 

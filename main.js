@@ -236,6 +236,7 @@ app.whenReady().then(() => {
   if (process.env.SIGNAL_AUDIO_E2E) require('./test/audio-e2e.js')(win);
   if (process.env.SIGNAL_FEATURES_E2E) require('./test/features-e2e.js')(win);
   if (process.env.SIGNAL_SCREENSHOTS) require('./test/screenshots.js')(win);
+  if (process.env.SIGNAL_MV_E2E) require('./test/multiview-e2e.js')(win);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

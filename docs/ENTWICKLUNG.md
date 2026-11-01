@@ -31,7 +31,8 @@ epg.js              XMLTV-Programmführer streamend laden (auch .gz), auf die Pl
 preload.js          sichere Brücke zwischen Oberfläche und Hauptprozess
 renderer/
   index.html        Oberfläche
-  app.js            Listen, Raster, Programmübersicht, Player-Logik, Puffer-Wächter, Tonspuren
+  app.js            Listen, Raster, Programmübersicht, Player-Logik, Puffer-Wächter, Tonspuren,
+                    Multiview (TilePlayer), verschiebbare Spalten
   m3u.js            M3U-Parser, Erkennung von Live/Film/Serie, Namensabgleich fürs EPG
   styles.css        Design
   vendor/mpegts.js  gepatchte mpegts.js (siehe unten)
@@ -89,13 +90,15 @@ SIGNAL_E2E=out SIGNAL_PLAYLIST=http://127.0.0.1:8099/full.m3u npm start         
 SIGNAL_FEATURES_E2E=out SIGNAL_PLAYLIST=http://127.0.0.1:8099/epg_a.m3u \
   SIGNAL_PLAYLIST_B=http://127.0.0.1:8099/epg_b.m3u npm start                         # EPG, Playlisten, Mini-Player
 SIGNAL_AUDIO_E2E=out SIGNAL_PLAYLIST=http://127.0.0.1:8099/audio.m3u npm start       # Tonspuren
+SIGNAL_MV_E2E=out SIGNAL_PLAYLIST=http://127.0.0.1:8099/mv.m3u npm start             # Multiview, Spalten
 SIGNAL_BENCH=out/bench.json SIGNAL_PLAYLIST=http://127.0.0.1:8099/bench2.m3u npm start  # Hänger messen
 SIGNAL_SCREENSHOTS=docs/screenshots SIGNAL_PLAYLIST=http://127.0.0.1:8099/demo.m3u npm start  # Screenshots
 ```
 
 Jeder Test schreibt ein Protokoll (`OK`/`FAIL` pro Prüfung) und Screenshots in den angegebenen Ordner und
 beendet die App danach. Der Testserver simuliert typisches IPTV-Verhalten: `?jitter=1` (Aussetzer),
-`?burst=<s>` (Anfangsburst) und `?loop=1` (Zeitstempel-Sprünge), siehe `test/testserver.py`.
+`?burst=<s>` (Anfangsburst), `?loop=1` (Zeitstempel-Sprünge) und `?limit=<n>` (Verbindungslimit des
+Anbieters), siehe `test/testserver.py`.
 
 ## Technische Grenzen
 

@@ -56,6 +56,7 @@ Flüssige Wiedergabe mit automatischem Puffer
 Tonspur-Auswahl, gemerkte Sprache
 Sender und Gruppen ausblenden
 Suche über alle Gruppen
+Multiview: bis zu 4 Sender gleichzeitig
 Mehrere Playlisten, schnell wechseln
 Weiterschauen bei Filmen und Serien
 Mini-Player im Vordergrund

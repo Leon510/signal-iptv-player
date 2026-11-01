@@ -15,6 +15,8 @@ Kabel- oder TV-Anbieter oder vom eigenen TV-Server. [Mehr dazu weiter unten.](#w
 - **Tonspuren wählen**, die Sprache merkt sich Signal für alle Sender
 - **Aussortieren:** Sender oder ganze Gruppen ausblenden, die du nie siehst
 - **Suche über alles**, nicht nur in der offenen Gruppe
+- **Multiview:** bis zu 4 Sender gleichzeitig, mit Ton aus dem Feld deiner Wahl
+- **Verschiebbare Spalten**, damit auch lange Sendernamen ganz sichtbar sind
 - **Mehrere Playlisten** speichern und mit einem Klick wechseln
 - **Mini-Player**, der im Vordergrund bleibt, und **Live zurückspulen** (bis zu 2 Minuten)
 - Favoriten, Sendernummern wie bei der Fernbedienung, vorheriger Sender per Rücktaste
@@ -24,6 +26,7 @@ Kabel- oder TV-Anbieter oder vom eigenen TV-Server. [Mehr dazu weiter unten.](#w
 |---|---|
 | ![Programmübersicht](docs/screenshots/02-programm.png) | ![Filme](docs/screenshots/04-filme.png) |
 | ![Serie mit Staffeln](docs/screenshots/05-serie.png) | ![Gruppen auswählen](docs/screenshots/06-auswahl.png) |
+| ![Multiview mit vier Sendern](docs/screenshots/08-multiview.png) | |
 
 ## Herunterladen
 
@@ -76,6 +79,7 @@ nicht gedacht.
 | `F` / Doppelklick | Vollbild |
 | `P` | Mini-Player |
 | `G` | Programmübersicht |
+| `V` | Multiview an/aus (`Alt`+`1`–`4` markiert ein Feld) |
 | `A` | Tonspur wechseln |
 | `S` / `H` | Favorit / Sender ausblenden |
 | `N` | Nächste Folge (Serien) |
@@ -94,6 +98,11 @@ weitere Tonspuren, wählst du über **Tonspur** eine andere. Sonst hilft **In VL
 **Ein Sender hakt.**
 Stell unter **Einstellungen → Wiedergabe** den Puffer auf **Hoch**. Signal vergrößert den Puffer nach Aussetzern
 auch selbst. Hakt es weiter, liegt es meistens am Server des Anbieters.
+
+**Im Multiview bleibt ein Feld schwarz oder zeigt einen Hinweis.**
+Jeder Sender im Multiview ist eine eigene Verbindung zu deinem Anbieter. Viele Anbieter erlauben nur eine oder
+zwei gleichzeitig. Signal erkennt das und zeigt es im betroffenen Feld an. Schließ dann ein anderes Feld oder
+nutze weniger Felder.
 
 **Der Programmführer bleibt leer.**
 Nicht jede Playlist bringt einen mit. Trag den EPG-Link (XMLTV, oft `.xml` oder `.xml.gz`) unter
@@ -127,7 +136,8 @@ Signal steht unter der [MIT-Lizenz](LICENSE). Mitgelieferte Komponenten haben ei
 
 **Signal is a modern, clean IPTV player for Windows** for your own M3U playlists. It includes live TV with an
 electronic programme guide (XMLTV), movies and series with resume, audio track selection, hiding channels and
-groups, multiple playlists, a mini player and smooth playback on unreliable servers. It is free, open source
+groups, multiple playlists, multiview with up to four channels, resizable columns, a mini player and smooth
+playback on unreliable servers. It is free, open source
 (MIT) and collects no data.
 
 Signal ships **without any channels or content**. Use playlists you are legally entitled to, for example from

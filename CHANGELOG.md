@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an Signal. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.5.0] – 2026-11-01
+
+### Neu
+- **Multiview:** bis zu 4 Sender derselben Playlist gleichzeitig, als 2 nebeneinander, 2×2 oder einer groß und
+  drei klein. Das markierte Feld bekommt den nächsten Sender aus der Liste, Ton kommt aus dem Feld mit dem
+  Lautsprecher. Doppelklick zeigt ein Feld groß. Lässt der Anbieter keine weitere Verbindung zu, sagt Signal das
+  im betroffenen Feld.
+- **Verschiebbare Spalten:** Kategorien und Senderliste lassen sich mit der Maus (oder Pfeiltasten) breiter
+  und schmaler ziehen, damit lange Sendernamen ganz sichtbar sind. Doppelklick auf den Trenner setzt zurück.
+
+### Verbessert
+- Sendernamen nutzen die volle Zeilenbreite; Ausblenden und Favorit erscheinen erst beim Überfahren
+- Voller Name und laufende Sendung als Tooltip
+
 ## [1.4.0] – 2026-10-28
 
 Erste öffentliche Version.
